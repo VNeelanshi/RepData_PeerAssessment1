@@ -1,25 +1,90 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Reproducible Research: Peer Assessment 1'
+author: "Neelanshi Varia"
+date: "August 5, 2017"
+output: html_document
+keep_md: true
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
 
+We download the dataset activity.csv from the url provided. The working directory is assumed to be the directory where the data will be downloaded and processed. We then unzip the dataset and load it for further use.
 
+```{r loadingData}
+library(ggplot2)
+myData <- read.csv("activity.csv")
+```
 
 ## What is mean total number of steps taken per day?
 
-
+```{r avgStepsPerDay}
+total_per_day <- tapply(myData$steps, myData$date, FUN=sum, na.rm=TRUE)
+qplot(total_per_day, binwidth = 2000, xlab="Total of steps per day", ylab = "no. of times", col = "red")
+mean(total_per_day, na.rm=TRUE) #finding mean of the steps
+median(total_per_day, na.rm=TRUE) #finding median of the steps
+```
 
 ## What is the average daily activity pattern?
 
+We will make a plot (i.e. type = "l") of 5-minute intervals and the average number of steps taken averaged for all days.
 
+```{r dailyPattern}
+avg <- aggregate(x=list(steps=myData$steps), by=list(interval=myData$interval),FUN=mean, na.rm=TRUE)
+ggplot(data=avg, aes(x=interval, y=steps)) +
+  geom_line() +
+  xlab("Interval") +
+  ylab("Average number of steps taken in it")
+```
 
 ## Imputing missing values
 
+There are many missing values in the dataset. Hence, we find a mechanism to solve the problem instead of removing the values because that affects the average. By the following chunk of code we see that there are 2304 missing number of values.
 
+```{r}
+impute <- sum(is.na(myData$steps))
+impute
+```
+
+Now we create a new dataset where we will replace the NA values with mean for that particular interval/day. 
+```{r newDataSet}
+newSet <- myData
+nas <- is.na(newSet$steps)
+avg_interval <- tapply(newSet$steps, newSet$interval, mean, na.rm=TRUE, simplify = TRUE)
+newSet$steps[nas] <- avg_interval[as.character(newSet$interval[nas])]
+```
+
+We now calculate the average number of steps per day to see the difference between earlier calculated histogram and the newer one. We plot the histogram.
+
+```{r}
+new_total <- aggregate(steps ~ date, data = newSet, FUN = sum, na.rm = TRUE)
+hist(new_total$steps, main = "Total steps per day", xlab = "Number of steps in a day", 
+    ylab = "intervals", col="red")
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day
+
+```{r}
+isWeekday <- function(date) {
+  day <- weekdays(date)
+  if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+    return("weekday")
+  else
+    return("weekend")
+}
+newSet$date <- as.Date(newSet$date)
+newSet$day <- sapply(newSet$date, FUN=isWeekday)
+```
+
+Plotting the weekday and weekend result.
+
+```{r}
+avg <- aggregate(steps ~ interval + day, data=newSet, mean)
+ggplot(avg, aes(interval, steps)) + geom_line() + facet_grid(day ~ .) +
+  xlab("5-minute interval") + ylab("Number of steps")
+```
